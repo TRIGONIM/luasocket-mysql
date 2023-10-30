@@ -1,7 +1,15 @@
-local socket = require("socket.core")
+local socket = require("socket")
 local sha256 = require("mysql.deps.sha").sha256
 local sha1 = require("mysql.deps.sha1").binary
 local bit = require("mysql.deps.bit")
+local null do
+	local ok, cjson = pcall(require, "cjson")
+	if ok then
+		null = cjson.null
+	else
+		null = {isnull = true}
+	end
+end
 
 -- Copyright (C) Yichun Zhang (agentzh)
 
@@ -16,7 +24,7 @@ local strchar = string.char
 local strfind = string.find
 local format = string.format
 local strrep = string.rep
-local null = {isnull = true} -- #note replaced
+-- local null = ngx.null -- #note replaced above
 local band = bit.band
 local bxor = bit.bxor
 local bor = bit.bor
@@ -141,7 +149,14 @@ for i = 0x01, 0x05 do
     converters[i] = tonumber
 end
 converters[0x00] = tonumber  -- decimal
--- converters[0x08] = tonumber  -- long long
+converters[0x08] = function(val) -- long long #note uncommented and modified due to COUNT(*) returns as string
+	-- /\  was commented in this commit: https://github.com/openresty/lua-resty-mysql/commit/5d1b298beeb48863d4a08ecadf51f56c1515e980
+	local num = tonumber(val)
+	if num < 100000000000000 then -- max number that lua can tostring without scientific notation
+		return num
+	end
+	return val
+end
 converters[0x09] = tonumber  -- int24
 converters[0x0d] = tonumber  -- year
 converters[0xf6] = tonumber  -- newdecimal
