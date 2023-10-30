@@ -1,43 +1,37 @@
+local socket = require("socket.core")
+local sha256 = require("mysql.deps.sha").sha256
+local sha1 = require("mysql.deps.sha1").binary
+local bit = require("mysql.deps.bit")
+
 -- Copyright (C) Yichun Zhang (agentzh)
 
 
-local bit = require "bit"
-local resty_sha256 = require "resty.sha256"
+
+-- local bit = require "bit32"
+-- local resty_sha256 = require "resty.sha256" -- #note usage replaced
 local sub = string.sub
-local tcp = ngx.socket.tcp
+local tcp = socket.tcp -- #note was ngx.socket.tcp
 local strbyte = string.byte
 local strchar = string.char
 local strfind = string.find
 local format = string.format
 local strrep = string.rep
-local null = ngx.null
+local null = {isnull = true} -- #note replaced
 local band = bit.band
 local bxor = bit.bxor
 local bor = bit.bor
 local lshift = bit.lshift
 local rshift = bit.rshift
-local tohex = bit.tohex
-local sha1 = ngx.sha1_bin
+local tohex = bit.tohex or function(a, b) return string.format("%x", a) end -- #note "or" added
+-- local sha1 = ngx.sha1_bin -- #note replaced above
 local concat = table.concat
 local setmetatable = setmetatable
 local error = error
 local tonumber = tonumber
 local to_int = math.floor
 
+-- #note not implemented
 local has_rsa, resty_rsa = pcall(require, "resty.rsa")
-
-
-if not ngx.config then
-    error("ngx_lua 0.9.11+ or ngx_stream_lua required")
-end
-
-if (not ngx.config.subsystem
-    or ngx.config.subsystem == "http") -- subsystem is http
-   and (not ngx.config.ngx_lua_version
-        or ngx.config.ngx_lua_version < 9011) -- old version
-then
-    error("ngx_lua 0.9.11+ required")
-end
 
 
 local ok, new_tab = pcall(require, "table.new")
@@ -302,43 +296,74 @@ local function _compute_old_token(password, scramble)
 end
 
 
+-- #note rewrited below
+-- local function _compute_sha256_token(password, scramble)
+--     if password == "" then
+--         return ""
+--     end
+
+--     local sha256 = resty_sha256:new()
+--     if not sha256 then
+--         return nil, "failed to create the sha256 object"
+--     end
+
+--     if not sha256:update(password) then
+--         return nil, "failed to update string to sha256"
+--     end
+
+--     local message1 = sha256:final()
+
+--     sha256:reset()
+
+--     if not sha256:update(message1) then
+--         return nil, "failed to update string to sha256"
+--     end
+
+--     local message1_hash = sha256:final()
+
+--     sha256:reset()
+
+--     if not sha256:update(message1_hash) then
+--         return nil, "failed to update string to sha256"
+--     end
+
+--     if not sha256:update(scramble) then
+--         return nil, "failed to update string to sha256"
+--     end
+
+--     local message2 = sha256:final()
+
+--     local n = #message2
+--     local bytes = new_tab(n, 0)
+--     for i = 1, n do
+--         bytes[i] = strchar(bxor(strbyte(message1, i), strbyte(message2, i)))
+--     end
+
+--     return concat(bytes)
+-- end
+
 local function _compute_sha256_token(password, scramble)
     if password == "" then
         return ""
     end
 
-    local sha256 = resty_sha256:new()
-    if not sha256 then
-        return nil, "failed to create the sha256 object"
-    end
+    local message1 = sha256(password)
+    local message1_hash = sha256(message1)
 
-    if not sha256:update(password) then
-        return nil, "failed to update string to sha256"
-    end
 
-    local message1 = sha256:final()
+    -- if not sha256:update(message1_hash) then
+    --     return nil, "failed to update string to sha256"
+    -- end
 
-    sha256:reset()
+    -- #todo #note idk how to implement multiple update for sha256
+    -- if not sha256:update(scramble) then
+    --     return nil, "failed to update string to sha256"
+    -- end
 
-    if not sha256:update(message1) then
-        return nil, "failed to update string to sha256"
-    end
+    -- #note #todo iam not sure if this is correct
+    local message2 = sha256(message1_hash .. scramble)
 
-    local message1_hash = sha256:final()
-
-    sha256:reset()
-
-    if not sha256:update(message1_hash) then
-        return nil, "failed to update string to sha256"
-    end
-
-    if not sha256:update(scramble) then
-        return nil, "failed to update string to sha256"
-    end
-
-    local message2 = sha256:final()
-
-    local n = #message2
+    local n = #message2 -- #todo its a string? :len() ?
     local bytes = new_tab(n, 0)
     for i = 1, n do
         bytes[i] = strchar(bxor(strbyte(message1, i), strbyte(message2, i)))
@@ -1183,12 +1208,12 @@ function _M.connect(self, opts)
         return nil, 'failed to connect: ' .. err
     end
 
-    local reused = sock:getreusedtimes()
-
-    if reused and reused > 0 then
-        self.state = STATE_CONNECTED
-        return 1
-    end
+    -- #note deleted, resty only. Fallback to 0
+    -- local reused = sock:getreusedtimes()
+    -- if reused and reused > 0 then
+    --     self.state = STATE_CONNECTED
+    --     return 1
+    -- end
 
     self.DEFAULT_CLIENT_FLAGS = bor(DEFAULT_CLIENT_FLAGS, CLIENT_PLUGIN_AUTH)
 
@@ -1232,7 +1257,8 @@ function _M.set_keepalive(self, ...)
     end
 
     self.state = nil
-    return sock:setkeepalive(...)
+    -- return sock:setkeepalive(...) -- #note resty only
+    return sock:close()
 end
 
 
@@ -1242,7 +1268,9 @@ function _M.get_reused_times(self)
         return nil, "not initialized"
     end
 
-    return sock:getreusedtimes()
+    -- #note тут тоже fallback без resty
+    -- return sock:getreusedtimes()
+    return 0
 end
 
 
