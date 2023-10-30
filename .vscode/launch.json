@@ -1,0 +1,13 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"arg": [],
+			"name": "launch",
+			"program": "${workspaceFolder}/test.lua",
+			"request": "launch",
+			"stopOnEntry": false,
+			"type": "lua"
+		},
+	],
+}
