@@ -91,12 +91,12 @@ function POOL_MT:run_query(q, timeout)
 		return q_res
 	else
 		-- if any problem with the request, then drop the connection (don't add it again),
-		-- to be recreated again.
+		-- so connection will be recreated.
 		-- Could be an invalid query, or the database disconnected (restart or something..)
 		self.connections.waiting:give() -- here we say we're waiting for a new connection
 
-		-- 2 варианта. Если БД отвалилась, то только self.state сбросит (бесполезно).
-		-- Иначе отправит COM_QUIT и закроет сокет
+		-- 2 possibles: if DB restarted, only self.state will be reset (useless).
+		-- Else will send COM_QUIT and close socket.
 		local ok, err = conn:close()
 		if not ok then
 			print("failed to close connection: ", err) -- может отпринтить, если БД отвалилась. То, что будет при sock:send(packet) (closed)
