@@ -1,3 +1,4 @@
+---@diagnostic disable: unbalanced-assignments, cast-local-type
 -- SOURCE: https://stackoverflow.com/questions/51559181/sha512-pure-lua-5-1-adaptation
 
 -- This module contains functions to calculate SHA2 digest.
